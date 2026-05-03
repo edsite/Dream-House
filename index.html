@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grade 5 Architects Gallery</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+    }
+    input, textarea, button {
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzx4FYf99HYQrgY5f6vvwbBaz6P6H7WJsxHustSPIF2HVVHPxJb3zZkGXWELs3frgyobg/exec';
+    const ADMIN_PASSWORD = 'rabbirabi';
+
+    function App() {
+      const [projects, setProjects] = useState([]);
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [password, setPassword] = useState('');
+      const [searchTerm, setSearchTerm] = useState('');
+      const [showPassword, setShowPassword] = useState(false);
+      const [isLoading, setIsLoading] = useState(false);
+      const [selectedProject, setSelectedProject] = useState(null);
+
+      const [formData, setFormData] = useState({
+        studentNames: '',
+        budgetSpent: '',
+        floorPlanImage: null,
+        orderFormImage: null,
+        rationaleType: 'text',
+        rationaleContent: '',
+        rationaleImage: null,
+        listingType: 'text',
+        listingContent: '',
+        listingImage: null,
+      });
+
+      useEffect(() => {
+        loadProjectsFromSheet();
+      }, []);
+
+      const loadProjectsFromSheet = async () => {
+        try {
+          setIsLoading(true);
+          const response = await fetch(GOOGLE_APPS_SCRIPT_URL);
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            setProjects(data);
+          }
+        } catch (error) {
+          console.error('Error loading projects:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const handlePasswordSubmit = (e) => {
+        e.preventDefault();
+        if (password === ADMIN_PASSWORD) {
+          setIsAdmin(true);
+          setPassword('');
+        } else {
+          alert('Incorrect password');
+          setPassword('');
+        }
+      };
+
+      const handleImageUpload = (e, field) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setFormData({
+              ...formData,
+              [field]: event.target.result,
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (!formData.studentNames || !formData.budgetSpent || !formData.floorPlanImage || !formData.orderFormImage) {
+          alert('Please fill in all required fields (student names, budget, floor plan, and order form)');
+          return;
+        }
+
+        try {
+          setIsLoading(true);
+          const newProject = {
+            id: Date.now(),
+            studentNames: formData.studentNames,
+            budgetSpent: formData.budgetSpent,
+            floorPlanImage: formData.floorPlanImage,
+            orderFormImage: formData.orderFormImage,
+            rationaleType: formData.rationaleType,
+            rationaleContent: formData.rationaleType === 'text' ? formData.rationaleContent : formData.rationaleImage,
+            listingType: formData.listingType,
+            listingContent: formData.listingType === 'text' ? formData.listingContent : formData.listingImage,
+            dateAdded: new Date().toLocaleDateString(),
+          };
+
+          const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(newProject),
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            await loadProjectsFromSheet();
+            
+            setFormData({
+              studentNames: '',
+              budgetSpent: '',
+              floorPlanImage: null,
+              orderFormImage: null,
+              rationaleType: 'text',
+              rationaleContent: '',
+              rationaleImage: null,
+              listingType: 'text',
+              listingContent: '',
+              listingImage: null,
+            });
+            alert('Project added successfully!');
+          } else {
+            alert('Error adding project: ' + (result.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Error submitting project:', error);
+          alert('Error adding project. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      // Deep Dive Modal Component
+      const Modal = ({ project, onClose }) => {
+        if (!project) return null;
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '8px',
+              maxWidth: '800px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              padding: '32px',
+              position: 'relative'
+            }}>
+              <button
+                onClick={onClose}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                ✕
+              </button>
+
+              <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
+                {project.studentNames}
+              </h1>
+              <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>
+                Budget Spent: ${project.budgetSpent}
+              </p>
+
+              {/* Floor Plan */}
+              <div style={{ marginBottom: '32px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>Floor Plan</h2>
+                {project.floorPlanImage && project.floorPlanImage.startsWith('data:') ? (
+                  <img src={project.floorPlanImage} style={{ maxWidth: '100%', borderRadius: '6px', border: '1px solid #e5e7eb' }} alt="Floor Plan" />
+                ) : (
+                  <p style={{ color: '#9ca3af' }}>Floor plan image not available</p>
+                )}
+              </div>
+
+              {/* Order Form */}
+              <div style={{ marginBottom: '32px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>Order Form & Budget</h2>
+                {project.orderFormImage && project.orderFormImage.startsWith('data:') ? (
+                  <img src={project.orderFormImage} style={{ maxWidth: '100%', borderRadius: '6px', border: '1px solid #e5e7eb' }} alt="Order Form" />
+                ) : (
+                  <p style={{ color: '#9ca3af' }}>Order form image not available</p>
+                )}
+              </div>
+
+              {/* Rationale */}
+              <div style={{ marginBottom: '32px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>Rationale</h2>
+                {project.rationaleType === 'text' ? (
+                  <p style={{ color: '#374151', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                    {project.rationaleContent}
+                  </p>
+                ) : (
+                  project.rationaleContent && project.rationaleContent.startsWith('data:') ? (
+                    <img src={project.rationaleContent} style={{ maxWidth: '100%', borderRadius: '6px', border: '1px solid #e5e7eb' }} alt="Rationale" />
+                  ) : (
+                    <p style={{ color: '#9ca3af' }}>Rationale image not available</p>
+                  )
+                )}
+              </div>
+
+              {/* Listing */}
+              <div style={{ marginBottom: '32px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>Real Estate Listing</h2>
+                {project.listingType === 'text' ? (
+                  <p style={{ color: '#374151', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                    {project.listingContent}
+                  </p>
+                ) : (
+                  project.listingContent && project.listingContent.startsWith('data:') ? (
+                    <img src={project.listingContent} style={{ maxWidth: '100%', borderRadius: '6px', border: '1px solid #e5e7eb' }} alt="Listing" />
+                  ) : (
+                    <p style={{ color: '#9ca3af' }}>Listing image not available</p>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      if (!isAdmin) {
+        return (
+          <div style={{ minHeight: '100vh', background: 'linear-gradient(to br, #f9fafb, #e5e7eb)' }}>
+            {/* Header */}
+            <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+              <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
+                <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>Grade 5 Architects</h1>
+                <p style={{ color: '#6b7280' }}>A Showcase of Student Design & Financial Planning</p>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 200px)' }}>
+              <div style={{ width: '100%', maxWidth: '500px', padding: '20px' }}>
+                {/* Login Form */}
+                <div style={{ background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '32px', marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', marginBottom: '24px' }}>Admin Access</h2>
+                  <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter password"
+                        style={{
+                          width: '100%',
+                          padding: '8px 16px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          outline: 'none',
+                          fontSize: '14px'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '12px',
+                          top: '8px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#9ca3af',
+                          fontSize: '16px'
+                        }}
+                      >
+                        {showPassword ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      style={{
+                        background: '#2563eb',
+                        color: 'white',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Login
+                    </button>
+                  </form>
+                </div>
+
+                {/* Public Gallery Preview */}
+                <div style={{ background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '32px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>Public Gallery</h3>
+                  {projects.length === 0 ? (
+                    <p style={{ color: '#9ca3af' }}>No projects yet. Check back soon!</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {projects.map(p => (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelectedProject(p)}
+                          style={{
+                            padding: '12px',
+                            background: '#f9fafb',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#f9fafb'}
+                        >
+                          <p style={{ fontWeight: '500', color: '#111827' }}>{p.studentNames}</p>
+                          <p style={{ fontSize: '12px', color: '#6b7280' }}>Budget: ${p.budgetSpent}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Modal project={selectedProject} onClose={() => setSelectedProject(null)} />
+          </div>
+        );
+      }
+
+      // ADMIN VIEW
+      return (
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(to br, #f9fafb, #e5e7eb)' }}>
+          {/* Admin Header */}
+          <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827' }}>Admin Panel</h1>
+                <p style={{ color: '#6b7280', fontSize: '12px' }}>Manage Grade 5 Architects Projects</p>
+              </div>
+              <button
+                onClick={() => setIsAdmin(false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#4b5563',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                🚪 Logout
+              </button>
+            </div>
+          </div>
+
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '32px' }}>
+              {/* Upload Form */}
+              <div>
+                <div style={{ background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '24px', position: 'sticky', top: '32px' }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📤 Add Project
+                  </h2>
+                  <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Student Names */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        Student Name(s) *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Rivka & Miri"
+                        value={formData.studentNames}
+                        onChange={(e) => setFormData({ ...formData, studentNames: e.target.value })}
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                    </div>
+
+                    {/* Budget Spent */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        Budget Spent *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., $847,500"
+                        value={formData.budgetSpent}
+                        onChange={(e) => setFormData({ ...formData, budgetSpent: e.target.value })}
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                    </div>
+
+                    {/* Floor Plan Image */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        Floor Plan Image *
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'floorPlanImage')}
+                        style={{ width: '100%', fontSize: '12px' }}
+                      />
+                      {formData.floorPlanImage && <p style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>✓ Image uploaded</p>}
+                    </div>
+
+                    {/* Order Form Image */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        Order Form Image *
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'orderFormImage')}
+                        style={{ width: '100%', fontSize: '12px' }}
+                      />
+                      {formData.orderFormImage && <p style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>✓ Image uploaded</p>}
+                    </div>
+
+                    {/* Rationale */}
+                    <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Rationale</label>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, rationaleType: 'text' })}
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: formData.rationaleType === 'text' ? '#2563eb' : '#e5e7eb',
+                            color: formData.rationaleType === 'text' ? 'white' : '#374151'
+                          }}
+                        >
+                          Text
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, rationaleType: 'image' })}
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: formData.rationaleType === 'image' ? '#2563eb' : '#e5e7eb',
+                            color: formData.rationaleType === 'image' ? 'white' : '#374151'
+                          }}
+                        >
+                          Image
+                        </button>
+                      </div>
+                      {formData.rationaleType === 'text' ? (
+                        <textarea
+                          placeholder="Paste rationale text..."
+                          value={formData.rationaleContent}
+                          onChange={(e) => setFormData({ ...formData, rationaleContent: e.target.value })}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '12px', outline: 'none', minHeight: '80px', fontFamily: 'inherit', resize: 'vertical' }}
+                        />
+                      ) : (
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, 'rationaleImage')}
+                          style={{ width: '100%', fontSize: '12px' }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Real Estate Listing */}
+                    <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Real Estate Listing</label>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, listingType: 'text' })}
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: formData.listingType === 'text' ? '#2563eb' : '#e5e7eb',
+                            color: formData.listingType === 'text' ? 'white' : '#374151'
+                          }}
+                        >
+                          Text
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, listingType: 'image' })}
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: formData.listingType === 'image' ? '#2563eb' : '#e5e7eb',
+                            color: formData.listingType === 'image' ? 'white' : '#374151'
+                          }}
+                        >
+                          Image
+                        </button>
+                      </div>
+                      {formData.listingType === 'text' ? (
+                        <textarea
+                          placeholder="Paste listing text..."
+                          value={formData.listingContent}
+                          onChange={(e) => setFormData({ ...formData, listingContent: e.target.value })}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '12px', outline: 'none', minHeight: '80px', fontFamily: 'inherit', resize: 'vertical' }}
+                        />
+                      ) : (
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, 'listingImage')}
+                          style={{ width: '100%', fontSize: '12px' }}
+                        />
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      style={{
+                        background: '#10b981',
+                        color: 'white',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontWeight: '500',
+                        cursor: isLoading ? 'wait' : 'pointer',
+                        fontSize: '14px',
+                        opacity: isLoading ? 0.6 : 1
+                      }}
+                    >
+                      {isLoading ? 'Adding...' : 'Add Project'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Projects List */}
+              <div>
+                <div style={{ background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '24px' }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '24px' }}>Manage Projects ({projects.length})</h2>
+
+                  {projects.length === 0 ? (
+                    <p style={{ color: '#9ca3af', textAlign: 'center', paddingTop: '48px', paddingBottom: '48px' }}>No projects yet. Add your first one!</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {projects.map((project) => (
+                        <div key={project.id} style={{ border: '1px solid #e5e7eb', borderRadius: '6px', padding: '16px' }}>
+                          <h3 style={{ fontWeight: 'bold', color: '#111827' }}>{project.studentNames}</h3>
+                          <p style={{ fontSize: '12px', color: '#6b7280' }}>Budget: ${project.budgetSpent}</p>
+                          <p style={{ fontSize: '11px', color: '#9ca3af' }}>Added: {project.dateAdded}</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px', fontSize: '11px' }}>
+                            <div style={{ background: '#f9fafb', padding: '8px', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: '500', color: '#374151' }}>Floor Plan</p>
+                              {project.floorPlanImage && <p style={{ color: '#10b981' }}>✓ Uploaded</p>}
+                            </div>
+                            <div style={{ background: '#f9fafb', padding: '8px', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: '500', color: '#374151' }}>Order Form</p>
+                              {project.orderFormImage && <p style={{ color: '#10b981' }}>✓ Uploaded</p>}
+                            </div>
+                            <div style={{ background: '#f9fafb', padding: '8px', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: '500', color: '#374151' }}>Rationale</p>
+                              <p style={{ color: '#6b7280', textTransform: 'capitalize' }}>{project.rationaleType}</p>
+                            </div>
+                            <div style={{ background: '#f9fafb', padding: '8px', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: '500', color: '#374151' }}>Listing</p>
+                              <p style={{ color: '#6b7280', textTransform: 'capitalize' }}>{project.listingType}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Modal project={selectedProject} onClose={() => setSelectedProject(null)} />
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
